@@ -1,0 +1,10 @@
+[package]
+name = "abbrws"
+version = "0.1.0"
+authors = ["Maarten de Vries <maarten@de-vri.es>"]
+edition = "2018"
+
+[dependencies]
+hyper = "0.13.0-alpha.4"
+tokio = "0.2.0-alpha"
+digest_auth = "0.2.1"
