@@ -13,6 +13,7 @@ pub struct Client<C> {
 #[derive(Clone, Debug)]
 pub struct InvalidStatusError {
 	status: http::StatusCode,
+	body: serde_json::Value,
 }
 
 #[derive(Debug)]
@@ -21,6 +22,7 @@ pub enum Error {
 	InvalidUri(http::uri::InvalidUri),
 	Http(http::Error),
 	Hyper(hyper::Error),
+	Json(serde_json::Error),
 }
 
 impl<C> Client<C>
@@ -37,7 +39,26 @@ where
 	}
 
 	pub async fn login(&mut self) -> Result<(), Error> {
-		let url : http::Uri = format!("{}/?json=1", self.root_url).parse().unwrap();
+		let url = format!("{}/?json=1", self.root_url).parse().unwrap();
+		let body = self.get(url).await?;
+		Ok(())
+	}
+
+	pub async fn get_signals(&mut self) -> Result<(), Error> {
+		let url = format!("{}/rw/iosystem/signals?json=1", self.root_url).parse().unwrap();
+		let body = self.get(url).await?;
+		eprintln!("got signals");
+		Ok(())
+	}
+
+	pub async fn get_signal(&mut self, signal: impl AsRef<str>) -> Result<(), Error> {
+		let url = format!("{}/rw/iosystem/signal/{}/?json=1", self.root_url, signal.as_ref()).parse().unwrap();
+		let body = self.get(url).await?;
+		println!("body: {:#?}", body);
+		todo!();
+	}
+
+	async fn get(&mut self, url: http::Uri) -> Result<serde_json::Value, Error> {
 		let request = move || {
 			hyper::Request::builder()
 				.uri(url.clone())
@@ -45,16 +66,21 @@ where
 				.body(hyper::Body::empty())
 		};
 
+		// Perform request.
 		let response = self.auth_cache.request(&mut self.http_client, request).await?;
-		if response.status() != http::StatusCode::OK {
+
+		let status = response.status();
+		let body = collect_body(response).await?;
+		let body = serde_json::from_slice(&body)?;
+
+		if status != http::StatusCode::OK {
 			return Err(InvalidStatusError {
-				status: response.status(),
+				status,
+				body,
 			}.into())
 		}
 
-		let body = collect_body(response).await?;
-		println!("body: {}", String::from_utf8(body).unwrap());
-		todo!();
+		Ok(body)
 	}
 }
 
@@ -82,6 +108,7 @@ impl std::fmt::Display for Error {
 			Self::InvalidStatus(e) => e.fmt(f),
 			Self::Http(e)          => e.fmt(f),
 			Self::Hyper(e)         => e.fmt(f),
+			Self::Json(e)          => e.fmt(f),
 		}
 	}
 }
@@ -110,6 +137,12 @@ impl From<http::Error> for Error {
 impl From<hyper::Error> for Error {
 	fn from(other: hyper::Error) -> Self {
 		Self::Hyper(other)
+	}
+}
+
+impl From<serde_json::Error> for Error {
+	fn from(other: serde_json::Error) -> Self {
+		Self::Json(other)
 	}
 }
 
