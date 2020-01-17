@@ -14,7 +14,7 @@ pub struct Client<C> {
 	root_url: http::Uri,
 	auth_cache: DigestAuthCache,
 	http_client: hyper::Client<C, hyper::Body>,
-	cookies: cookie::CookieJar,
+	cookies: CookieJar,
 }
 
 impl<C> Client<C>
@@ -27,7 +27,7 @@ where
 			root_url,
 			http_client,
 			auth_cache: DigestAuthCache::new(user.into(), password.into()),
-			cookies: cookie::CookieJar::new(),
+			cookies: CookieJar::new(),
 		})
 	}
 
