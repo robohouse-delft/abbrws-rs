@@ -52,11 +52,6 @@ impl DigestAuthCache {
 		B: HttpBody + Send + 'static,
 		<B as HttpBody>::Data : Send,
 		<B as HttpBody>::Error : Into<Box<(dyn std::error::Error + Send + Sync + 'static)>>,
-
-		//C::Transport: 'static,
-		//C::Future: 'static,
-		////B: Payload + Unpin + Send + 'static,
-		//B::Data: Send + Unpin,
 	{
 		// Try the request with possibly cached challenge / response.
 		let mut request = build_request()?;
