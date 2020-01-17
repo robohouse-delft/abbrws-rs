@@ -35,7 +35,7 @@ where
 	C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
 	pub fn new(http_client: hyper::Client<C, hyper::Body>, host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri> {
-		let root_url = hyper::Uri::try_from(format!("http://{}/", host.as_ref()))?;
+		let root_url = hyper::Uri::try_from(format!("http://{}", host.as_ref()))?;
 		Ok(Self {
 			root_url,
 			http_client,
