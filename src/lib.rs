@@ -33,7 +33,7 @@ where
 
 	pub async fn login(&mut self) -> Result<(), Error> {
 		let url = format!("{}/?json=1", self.root_url).parse().unwrap();
-		let body = self.get(url).await?;
+		self.get(url).await?;
 		Ok(())
 	}
 
