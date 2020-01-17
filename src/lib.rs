@@ -1,124 +1,123 @@
-use hyper::Body;
-use hyper::Client;
-use hyper::Request;
-use hyper::Response;
+mod digest_auth_cache;
+use digest_auth_cache::DigestAuthCache;
 use hyper::body::HttpBody;
-use hyper::client::connect::Connect;
-use hyper::header::HeaderValue;
 
-/// Cache for HTTP digest authentication.
-///
-/// The cache can be used to perform requests,
-/// while caching the digest authentication challenge from the server.
-pub struct DigestAuthCache {
-	username: String,
-	password: String,
-	challenge: Option<digest_auth::WwwAuthenticateHeader>,
+use std::convert::TryFrom;
+
+pub struct Client<C> {
+	root_url: http::Uri,
+	auth_cache: DigestAuthCache,
+	http_client: hyper::Client<C, hyper::Body>,
 }
 
-impl DigestAuthCache {
-	/// Create an empty digest auth cache.
-	pub fn new(username: String, password: String) -> Self {
-		Self {
-			username,
-			password,
-			challenge: None,
-		}
+#[derive(Clone, Debug)]
+pub struct InvalidStatusError {
+	status: http::StatusCode,
+}
+
+#[derive(Debug)]
+pub enum Error {
+	InvalidStatus(InvalidStatusError),
+	InvalidUri(http::uri::InvalidUri),
+	Http(http::Error),
+	Hyper(hyper::Error),
+}
+
+impl<C> Client<C>
+where
+	C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
+{
+	pub fn new(http_client: hyper::Client<C, hyper::Body>, host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri> {
+		let root_url = hyper::Uri::try_from(format!("http://{}/", host.as_ref()))?;
+		Ok(Self {
+			root_url,
+			http_client,
+			auth_cache: DigestAuthCache::new(user.into(), password.into()),
+		})
 	}
 
-	/// Perform a request using the given client.
-	///
-	/// If a cached challenge is available,
-	/// an Authorization header is added to the request containing a response to the challenge.
-	///
-	/// If a request fails with status 401 Unauthorized,
-	/// the response is checked for a WWW-Authenticate header containing a new challenge.
-	/// The new challenge is then cached, and the request is retried with the new challenge.
-	pub async fn request<C, B, BuildRequest>(
-		&mut self,
-		client: &Client<C, B>,
-		mut build_request: BuildRequest,
-	) -> hyper::Result<Response<Body>>
-	where
-		BuildRequest: FnMut() -> Request<B>,
-		C: Connect + Clone + Send + Sync + 'static,
-		B: HttpBody + Send + 'static,
-		<B as HttpBody>::Data : Send,
-		<B as HttpBody>::Error : Into<Box<(dyn std::error::Error + Send + Sync + 'static)>>,
+	pub async fn login(&mut self) -> Result<(), Error> {
+		let url : http::Uri = format!("{}/?json=1", self.root_url).parse().unwrap();
+		let request = move || {
+			hyper::Request::builder()
+				.uri(url.clone())
+				.method(hyper::Method::GET)
+				.body(hyper::Body::empty())
+		};
 
-		//C::Transport: 'static,
-		//C::Future: 'static,
-		////B: Payload + Unpin + Send + 'static,
-		//B::Data: Send + Unpin,
-	{
-		// Try the request with possibly cached challenge / response.
-		let mut request = build_request();
-		self.add_digest_auth(&mut request);
-		let response = client.request(request).await?;
-
-		// If we get a 401 Unauthorized, try to get a new challenge from the response.
-		if response.status() != hyper::StatusCode::UNAUTHORIZED {
-			return Ok(response);
+		let response = self.auth_cache.request(&mut self.http_client, request).await?;
+		if response.status() != http::StatusCode::OK {
+			return Err(InvalidStatusError {
+				status: response.status(),
+			}.into())
 		}
 
-		// The challenge should be in the WWW-Authenticate header.
-		let challenge = response.headers().get(hyper::header::WWW_AUTHENTICATE).map(|x| x.to_str());
-		let challenge = match challenge {
-			Some(Ok(x)) => x,
-			Some(Err(_)) | None => return Ok(response),
-		};
-
-		// Parse the header and update the cached challenge.
-		self.challenge = match digest_auth::parse(challenge) {
-			Ok(x) => Some(x),
-			Err(_) => return Ok(response),
-		};
-
-		// Retry request with new Authorization header.
-		let mut request = build_request();
-		self.add_digest_auth(&mut request);
-		client.request(request).await
-	}
-
-	/// If a cached challenge is available, add an Authorization header to the request.
-	///
-	/// Returns true if the header was added, false otherwise.
-	fn add_digest_auth<B>(&mut self, request: &mut Request<B>) -> bool {
-		let challenge = match self.challenge.as_mut() {
-			Some(x) => x,
-			None => return false,
-		};
-
-		let context = digest_auth::AuthContext {
-			username: self.username.as_str().into(),
-			password: self.password.as_str().into(),
-			uri: request.uri().path().into(),
-			method: convert_method(request.method()),
-			body: None,
-			cnonce: None,
-		};
-
-		let answer = challenge.respond(&context).map(|x| HeaderValue::from_str(&x.to_header_string()));
-		let answer = match answer {
-			Ok(Ok(x)) => x,
-			_ => return false,
-		};
-		request.headers_mut().insert(hyper::header::AUTHORIZATION, answer);
-		true
+		let body = collect_body(response).await?;
+		println!("body: {}", String::from_utf8(body).unwrap());
+		todo!();
 	}
 }
 
-fn convert_method(method: &hyper::Method) -> digest_auth::HttpMethod {
-	match method {
-		&hyper::Method::GET => digest_auth::HttpMethod::GET,
-		&hyper::Method::POST => digest_auth::HttpMethod::POST,
-		&hyper::Method::HEAD => digest_auth::HttpMethod::HEAD,
-		&hyper::Method::PUT => digest_auth::HttpMethod::OTHER("PUT"),
-		&hyper::Method::DELETE => digest_auth::HttpMethod::OTHER("DELETE"),
-		&hyper::Method::PATCH => digest_auth::HttpMethod::OTHER("PATCH"),
-		&hyper::Method::CONNECT => digest_auth::HttpMethod::OTHER("CONNECT"),
-		&hyper::Method::TRACE => digest_auth::HttpMethod::OTHER("TRACE"),
-		x => panic!("unsupported HTTP method: {}", x.as_ref()),
+
+async fn collect_body(response: hyper::Response<hyper::Body>) -> Result<Vec<u8>, hyper::Error> {
+	let mut body = response.into_body();
+	let mut data = Vec::with_capacity(512);
+	while let Some(chunk) = body.data().await {
+		data.extend(chunk?.as_ref());
+	}
+
+	Ok(data)
+}
+
+impl std::fmt::Display for InvalidStatusError {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "unexpected status code: {}", self.status)
 	}
 }
 
+impl std::fmt::Display for Error {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			Self::InvalidUri(e)    => e.fmt(f),
+			Self::InvalidStatus(e) => e.fmt(f),
+			Self::Http(e)          => e.fmt(f),
+			Self::Hyper(e)         => e.fmt(f),
+		}
+	}
+}
+
+impl std::error::Error for InvalidStatusError {}
+impl std::error::Error for Error {}
+
+impl From<InvalidStatusError> for Error {
+	fn from(other: InvalidStatusError) -> Self {
+		Self::InvalidStatus(other)
+	}
+}
+
+impl From<http::uri::InvalidUri> for Error {
+	fn from(other: http::uri::InvalidUri) -> Self {
+		Self::InvalidUri(other)
+	}
+}
+
+impl From<http::Error> for Error {
+	fn from(other: http::Error) -> Self {
+		Self::Http(other)
+	}
+}
+
+impl From<hyper::Error> for Error {
+	fn from(other: hyper::Error) -> Self {
+		Self::Hyper(other)
+	}
+}
+
+impl From<digest_auth_cache::RequestError> for Error {
+	fn from(other: digest_auth_cache::RequestError) -> Self {
+		match other {
+			digest_auth_cache::RequestError::Http(e)  => Self::from(e),
+			digest_auth_cache::RequestError::Hyper(e) => Self::from(e),
+		}
+	}
+}
