@@ -1,7 +1,11 @@
 [package]
 name = "abbrws"
 version = "0.1.0"
-authors = ["Maarten de Vries <maarten@de-vri.es>"]
+repository = "https://github.com/robohouse-delft/abbrws-rs"
+authors = [
+	"Maarten de Vries <maarten@de-vri.es>",
+	"RoboHouse <robohouse@robovalley.com>",
+]
 edition = "2018"
 
 [dependencies]
