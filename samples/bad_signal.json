@@ -1,0 +1,1 @@
+{"_links":{"base": { "href": "http://192.168.0.5:80/" }},"_embedded" :{ "status" : {"code":-1073445879, "msg": "rws_resource_iosystem.cpp[1961] ERROR: rws_component_iosystem.cpp[427]: code: 0xc0048409 eio_signal_open_by_name failed with status = -60;  code:-1073445879 icode:-1"}, "_state":[  ] }}
