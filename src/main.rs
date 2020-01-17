@@ -1,5 +1,6 @@
 use std::io::Write;
 use hyper::Client;
+use hyper::body::HttpBody;
 use abbrws::DigestAuthCache;
 
 #[tokio::main]
@@ -18,8 +19,8 @@ async fn main() {
 async fn body(response: hyper::Response<hyper::Body>) -> Result<Vec<u8>, hyper::Error> {
 	let mut body = response.into_body();
 	let mut data = Vec::with_capacity(512);
-	while let Some(chunk) = body.next().await {
-		data.extend(chunk?.into_bytes());
+	while let Some(chunk) = body.data().await {
+		data.extend(chunk?.as_ref());
 	}
 
 	Ok(data)
