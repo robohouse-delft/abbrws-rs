@@ -6,6 +6,8 @@ use hyper::body::HttpBody;
 use hyper::client::connect::Connect;
 use hyper::header::HeaderValue;
 
+use crate::Error;
+
 /// Cache for HTTP digest authentication.
 ///
 /// The cache can be used to perform requests,
@@ -14,13 +16,6 @@ pub struct DigestAuthCache {
 	username: String,
 	password: String,
 	challenge: Option<digest_auth::WwwAuthenticateHeader>,
-}
-
-/// An error that can be returned by a request through the cache.
-#[derive(Debug)]
-pub enum RequestError {
-	Hyper(hyper::Error),
-	Http(http::Error),
 }
 
 impl DigestAuthCache {
@@ -45,7 +40,7 @@ impl DigestAuthCache {
 		&mut self,
 		client: &Client<C, B>,
 		mut build_request: BuildRequest,
-	) -> Result<Response<Body>, RequestError>
+	) -> Result<Response<Body>, Error>
 	where
 		BuildRequest: FnMut() -> http::Result<Request<B>>,
 		C: Connect + Clone + Send + Sync + 'static,
@@ -123,27 +118,3 @@ fn convert_method(method: &hyper::Method) -> digest_auth::HttpMethod {
 		x => panic!("unsupported HTTP method: {}", x.as_ref()),
 	}
 }
-
-
-impl From<hyper::Error> for RequestError {
-	fn from(other: hyper::Error) -> Self {
-		Self::Hyper(other)
-	}
-}
-
-impl From<http::Error> for RequestError {
-	fn from(other: http::Error) -> Self {
-		Self::Http(other)
-	}
-}
-
-impl std::fmt::Display for RequestError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Self::Hyper(e) => e.fmt(f),
-			Self::Http(e) => e.fmt(f),
-		}
-	}
-}
-
-impl std::error::Error for RequestError {}

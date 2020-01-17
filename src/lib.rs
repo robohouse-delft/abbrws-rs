@@ -6,28 +6,15 @@ use hyper::body::HttpBody;
 
 use std::convert::TryFrom;
 
+mod error;
+pub use error::Error;
+pub use error::InvalidStatusError;
+
 pub struct Client<C> {
 	root_url: http::Uri,
 	auth_cache: DigestAuthCache,
 	http_client: hyper::Client<C, hyper::Body>,
 	cookies: cookie::CookieJar,
-}
-
-#[derive(Clone, Debug)]
-pub struct InvalidStatusError {
-	status: http::StatusCode,
-	body: serde_json::Value,
-}
-
-#[derive(Debug)]
-pub enum Error {
-	InvalidStatus(InvalidStatusError),
-	InvalidUri(http::uri::InvalidUri),
-	Http(http::Error),
-	Hyper(hyper::Error),
-	Json(serde_json::Error),
-	InvalidHeader(hyper::header::ToStrError),
-	InvalidCookie(cookie::ParseError),
 }
 
 impl<C> Client<C>
@@ -115,78 +102,4 @@ async fn collect_body(response: hyper::Response<hyper::Body>) -> Result<Vec<u8>,
 	}
 
 	Ok(data)
-}
-
-impl std::fmt::Display for InvalidStatusError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "unexpected status code: {}", self.status)
-	}
-}
-
-impl std::fmt::Display for Error {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Self::InvalidUri(e)    => e.fmt(f),
-			Self::InvalidStatus(e) => e.fmt(f),
-			Self::Http(e)          => e.fmt(f),
-			Self::Hyper(e)         => e.fmt(f),
-			Self::Json(e)          => e.fmt(f),
-			Self::InvalidHeader(e) => e.fmt(f),
-			Self::InvalidCookie(e) => e.fmt(f),
-		}
-	}
-}
-
-impl std::error::Error for InvalidStatusError {}
-impl std::error::Error for Error {}
-
-impl From<InvalidStatusError> for Error {
-	fn from(other: InvalidStatusError) -> Self {
-		Self::InvalidStatus(other)
-	}
-}
-
-impl From<http::uri::InvalidUri> for Error {
-	fn from(other: http::uri::InvalidUri) -> Self {
-		Self::InvalidUri(other)
-	}
-}
-
-impl From<http::Error> for Error {
-	fn from(other: http::Error) -> Self {
-		Self::Http(other)
-	}
-}
-
-impl From<hyper::Error> for Error {
-	fn from(other: hyper::Error) -> Self {
-		Self::Hyper(other)
-	}
-}
-
-impl From<serde_json::Error> for Error {
-	fn from(other: serde_json::Error) -> Self {
-		Self::Json(other)
-	}
-}
-
-impl From<hyper::header::ToStrError> for Error {
-	fn from(other: hyper::header::ToStrError) -> Self {
-		Self::InvalidHeader(other)
-	}
-}
-
-impl From<cookie::ParseError> for Error {
-	fn from(other: cookie::ParseError) -> Self {
-		Self::InvalidCookie(other)
-	}
-}
-
-impl From<digest_auth_cache::RequestError> for Error {
-	fn from(other: digest_auth_cache::RequestError) -> Self {
-		match other {
-			digest_auth_cache::RequestError::Http(e)  => Self::from(e),
-			digest_auth_cache::RequestError::Hyper(e) => Self::from(e),
-		}
-	}
 }
