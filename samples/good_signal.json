@@ -1,1 +1,29 @@
-{"_links":{"base": { "href": "http://192.168.0.5:80/rw/iosystem/" }},"_embedded" :{  "_state":[  { "_links": { "device": { "href": "devices/PANEL?json=1"} }, "_type":"ios-signal", "_title":"Local/PANEL/SS2", "name":"SS2", "type":"DI", "category":"safety", "lvalue":"1", "lstate": "not simulated", "unitnm": "PANEL", "phstate": "valid", "pvalue": "1", "ltime-sec": "1579255059", "ltime-microsec": "538338", "ptime-sec": "1579255059", "ptime-microsec": "538338", "quality": "1" }  ] }}
+{
+  "_links": {
+    "base": {
+      "href": "http://192.168.0.5:80/rw/iosystem/"
+    }
+  },
+  "_embedded" : {
+    "_state": [
+      {
+        "_links": { "device": { "href": "devices/PANEL?json=1"} },
+        "_type":"ios-signal",
+        "_title":"Local/PANEL/SS2",
+        "name":"SS2",
+        "type":"DI",
+        "category":"safety",
+        "lvalue":"1",
+        "lstate": "not simulated",
+        "unitnm": "PANEL",
+        "phstate": "valid",
+        "pvalue": "1",
+        "ltime-sec": "1579255059",
+        "ltime-microsec": "538338",
+        "ptime-sec": "1579255059",
+        "ptime-microsec": "538338",
+        "quality": "1"
+      }
+    ]
+  }
+}

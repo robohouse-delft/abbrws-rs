@@ -9,6 +9,12 @@ use std::convert::TryFrom;
 mod error;
 pub use error::Error;
 pub use error::InvalidStatusError;
+pub use error::RemoteFailureError;
+
+mod parse;
+pub use parse::signal::Signal;
+pub use parse::signal::SignalKind;
+pub use parse::signal::SignalValue;
 
 pub struct Client<C> {
 	root_url: http::Uri,
@@ -37,21 +43,25 @@ where
 		Ok(())
 	}
 
-	pub async fn get_signals(&mut self) -> Result<(), Error> {
+	pub async fn get_signals(&mut self) -> Result<Vec<Signal>, Error> {
 		let url = format!("{}/rw/iosystem/signals?json=1", self.root_url).parse().unwrap();
 		let body = self.get(url).await?;
-		eprintln!("got signals");
-		Ok(())
+		Ok(parse::signal::parse_list(&body)?.map_err(|e| RemoteFailureError {
+			code: Some(e.code),
+			message: e.message,
+		})?)
 	}
 
-	pub async fn get_signal(&mut self, signal: impl AsRef<str>) -> Result<(), Error> {
+	pub async fn get_signal(&mut self, signal: impl AsRef<str>) -> Result<Signal, Error> {
 		let url = format!("{}/rw/iosystem/signal/{}/?json=1", self.root_url, signal.as_ref()).parse().unwrap();
 		let body = self.get(url).await?;
-		println!("body: {:#?}", body);
-		todo!();
+		Ok(parse::signal::parse_one(&body)?.map_err(|e| RemoteFailureError {
+			code: Some(e.code),
+			message: e.message,
+		})?)
 	}
 
-	async fn get(&mut self, url: http::Uri) -> Result<serde_json::Value, Error> {
+	async fn get(&mut self, url: http::Uri) -> Result<Vec<u8>, Error> {
 		// Copy cookies into a list of HeaderValue objects.
 		let cookie_headers : Vec<_> = self.cookies.iter().map(|cookie| {
 			// Unwrap should be fine, we already parsed it from a HeaderValue earlier.
@@ -80,7 +90,6 @@ where
 
 		let status = response.status();
 		let body = collect_body(response).await?;
-		let body = serde_json::from_slice(&body)?;
 
 		if status != http::StatusCode::OK {
 			return Err(InvalidStatusError {

@@ -14,5 +14,9 @@ digest_auth = "0.2.1"
 future-utils = "0.12.1"
 http = "0.2.0"
 hyper = "0.13.1"
+serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
 tokio = { version="0.2.9", features=["rt-threaded", "macros"] }
+
+[dev-dependencies]
+assert2 = "0.1.1"
