@@ -1,7 +1,6 @@
 #[derive(Clone, Debug)]
 pub struct InvalidStatusError {
 	pub status: http::StatusCode,
-	pub body: serde_json::Value,
 }
 
 #[derive(Clone, Debug)]

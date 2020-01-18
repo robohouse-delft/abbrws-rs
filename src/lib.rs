@@ -92,9 +92,9 @@ where
 		let body = collect_body(response).await?;
 
 		if status != http::StatusCode::OK {
+			// TODO: Check mime type and decode error.
 			return Err(InvalidStatusError {
 				status,
-				body,
 			}.into())
 		}
 
