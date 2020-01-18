@@ -1,17 +1,12 @@
 #[derive(Clone, Debug)]
-pub struct InvalidStatusError {
-	pub status: http::StatusCode,
-}
-
-#[derive(Clone, Debug)]
 pub struct RemoteFailureError {
+	pub http_status: hyper::StatusCode,
 	pub code: Option<u32>,
 	pub message: String,
 }
 
 #[derive(Debug)]
 pub enum Error {
-	InvalidStatus(InvalidStatusError),
 	RemoteFailure(RemoteFailureError),
 	InvalidUri(http::uri::InvalidUri),
 	Http(http::Error),
@@ -21,26 +16,25 @@ pub enum Error {
 	InvalidCookie(cookie::ParseError),
 }
 
-impl std::fmt::Display for InvalidStatusError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "unexpected status code: {}", self.status)
-	}
-}
-
 impl std::fmt::Display for RemoteFailureError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "remote call failed with HTTP status {}", self.http_status)?;
+
 		if let Some(code) = self.code {
-			write!(f, "server reported error with code 0x{:08X}: {}", code, self.message)
-		} else {
-			write!(f, "server reported error: {}", self.message)
+			write!(f, "and code 0x{:08X}", code)?;
 		}
+
+		if !self.message.is_empty() {
+			write!(f, ": {}", self.message)?;
+		}
+
+		Ok(())
 	}
 }
 
 impl std::fmt::Display for Error {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			Self::InvalidStatus(e) => e.fmt(f),
 			Self::RemoteFailure(e) => e.fmt(f),
 			Self::InvalidUri(e)    => e.fmt(f),
 			Self::Http(e)          => e.fmt(f),
@@ -52,15 +46,8 @@ impl std::fmt::Display for Error {
 	}
 }
 
-impl std::error::Error for InvalidStatusError {}
 impl std::error::Error for RemoteFailureError {}
 impl std::error::Error for Error {}
-
-impl From<InvalidStatusError> for Error {
-	fn from(other: InvalidStatusError) -> Self {
-		Self::InvalidStatus(other)
-	}
-}
 
 impl From<RemoteFailureError> for Error {
 	fn from(other: RemoteFailureError) -> Self {

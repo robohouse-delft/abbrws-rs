@@ -8,7 +8,6 @@ use std::convert::TryFrom;
 
 mod error;
 pub use error::Error;
-pub use error::InvalidStatusError;
 pub use error::RemoteFailureError;
 
 mod parse;
@@ -47,6 +46,7 @@ where
 		let url = format!("{}/rw/iosystem/signals?json=1", self.root_url).parse().unwrap();
 		let body = self.get(url).await?;
 		Ok(parse::signal::parse_list(&body)?.map_err(|e| RemoteFailureError {
+			http_status: hyper::StatusCode::INTERNAL_SERVER_ERROR, // TODO
 			code: Some(e.code),
 			message: e.message,
 		})?)
@@ -56,6 +56,7 @@ where
 		let url = format!("{}/rw/iosystem/signal/{}/?json=1", self.root_url, signal.as_ref()).parse().unwrap();
 		let body = self.get(url).await?;
 		Ok(parse::signal::parse_one(&body)?.map_err(|e| RemoteFailureError {
+			http_status: hyper::StatusCode::INTERNAL_SERVER_ERROR, // TODO
 			code: Some(e.code),
 			message: e.message,
 		})?)
@@ -88,20 +89,21 @@ where
 			self.cookies.add(Cookie::parse(cookie)?);
 		}
 
-		let status = response.status();
+		let http_status = response.status();
 		let body = collect_body(response).await?;
 
-		if status != http::StatusCode::OK {
+		if http_status != http::StatusCode::OK {
 			// TODO: Check mime type and decode error.
-			return Err(InvalidStatusError {
-				status,
+			return Err(RemoteFailureError {
+				http_status,
+				code: None,
+				message: String::new(),
 			}.into())
 		}
 
 		Ok(body)
 	}
 }
-
 
 async fn collect_body(response: hyper::Response<hyper::Body>) -> Result<Vec<u8>, hyper::Error> {
 	let mut body = response.into_body();
