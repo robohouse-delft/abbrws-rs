@@ -3,12 +3,15 @@ use cookie::Cookie;
 use cookie::CookieJar;
 use digest_auth_cache::DigestAuthCache;
 use hyper::body::HttpBody;
+use mime::Mime;
 
 use std::convert::TryFrom;
 
 mod error;
 pub use error::Error;
 pub use error::RemoteFailureError;
+pub use error::MalformedContentTypeError;
+pub use error::UnexpectedContentTypeError;
 
 mod parse;
 pub use parse::signal::Signal;
@@ -45,21 +48,13 @@ where
 	pub async fn get_signals(&mut self) -> Result<Vec<Signal>, Error> {
 		let url = format!("{}/rw/iosystem/signals?json=1", self.root_url).parse().unwrap();
 		let body = self.get(url).await?;
-		Ok(parse::signal::parse_list(&body)?.map_err(|e| RemoteFailureError {
-			http_status: hyper::StatusCode::INTERNAL_SERVER_ERROR, // TODO
-			code: Some(e.code),
-			message: e.message,
-		})?)
+		Ok(parse::signal::parse_list(&body)?)
 	}
 
 	pub async fn get_signal(&mut self, signal: impl AsRef<str>) -> Result<Signal, Error> {
 		let url = format!("{}/rw/iosystem/signal/{}/?json=1", self.root_url, signal.as_ref()).parse().unwrap();
 		let body = self.get(url).await?;
-		Ok(parse::signal::parse_one(&body)?.map_err(|e| RemoteFailureError {
-			http_status: hyper::StatusCode::INTERNAL_SERVER_ERROR, // TODO
-			code: Some(e.code),
-			message: e.message,
-		})?)
+		Ok(parse::signal::parse_one(&body)?)
 	}
 
 	async fn get(&mut self, url: http::Uri) -> Result<Vec<u8>, Error> {
@@ -90,18 +85,50 @@ where
 		}
 
 		let http_status = response.status();
-		let body = collect_body(response).await?;
+		let content_type = get_content_type(&response)?;
 
-		if http_status != http::StatusCode::OK {
-			// TODO: Check mime type and decode error.
-			return Err(RemoteFailureError {
-				http_status,
-				code: None,
-				message: String::new(),
-			}.into())
+		if http_status == http::StatusCode::OK {
+			if content_type.essence_str() == "application/json" {
+				Ok(collect_body(response).await?)
+			} else {
+				Err(UnexpectedContentTypeError { actual: content_type, expected: "application/json".into() }.into())
+			}
+		} else {
+			match content_type.essence_str() {
+				"text/plain" => {
+					Err(plain_text_to_error(http_status, collect_body(response).await?).into())
+				},
+				"application/json" => {
+					let error = parse::parse_error(&collect_body(response).await?)?;
+					Err(RemoteFailureError { http_status, code: Some(error.code), message: error.message }.into())
+				},
+				_ => Err(UnexpectedContentTypeError { actual: content_type, expected: "application/json or text/plain".into() }.into()),
+			}
 		}
+	}
+}
 
-		Ok(body)
+fn get_content_type<B>(response: &hyper::Response<B>) -> Result<Mime, MalformedContentTypeError> {
+	let content_type = response.headers().get(hyper::header::CONTENT_TYPE)
+		.ok_or(MalformedContentTypeError { content_type: Vec::new() })?;
+
+	let make_error = || MalformedContentTypeError {
+		content_type: content_type.as_bytes().to_owned(),
+	};
+
+	let content_type = content_type.to_str().map_err(|_| make_error())?;
+	content_type.parse().map_err(|_| make_error())
+}
+
+fn plain_text_to_error(http_status: hyper::StatusCode, body: Vec<u8>) -> RemoteFailureError {
+	let message = String::from_utf8(body).ok()
+		.filter(|x| x.len() <= 150)
+		.unwrap_or_default();
+
+	RemoteFailureError {
+		http_status,
+		code: None,
+		message
 	}
 }
 

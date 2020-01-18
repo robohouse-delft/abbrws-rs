@@ -1,6 +1,5 @@
 use serde::Deserialize;
 use serde::Deserializer;
-use serde::de::Error;
 
 pub mod signal;
 
@@ -22,55 +21,48 @@ fn deserialize_error_code<'de, D: Deserializer<'de>>(deserializer: D) -> Result<
 
 #[derive(Clone, Debug, Deserialize)]
 struct OuterMessage<T> {
-	_embedded: InnerMessage<T>,
+	_embedded: T,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 struct InnerMessage<T> {
 	_state: T,
-	status: Option<ErrorStatus>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-enum OneOrNone<T> {
-	One((T, )),
-	None([(); 0]),
+struct InnerErrorMessage {
+	status: ErrorStatus,
 }
 
-impl<T> OneOrNone<T> {
-	fn into_option(self) -> Option<T> {
-		match self {
-			Self::One((x, )) => Some(x),
-			Self::None(_) => None,
-		}
-	}
+pub fn parse_error(data: &[u8]) -> Result<ErrorStatus, serde_json::Error>
+{
+	let outer : OuterMessage<InnerErrorMessage> = serde_json::from_slice(data)?;
+	Ok(outer._embedded.status)
 }
 
-pub fn parse<'a, T>(data: &'a [u8]) -> Result<Result<T, ErrorStatus>, serde_json::Error>
+pub fn parse_vec<'a, T>(data: &'a [u8]) -> Result<Vec<T>, serde_json::Error>
 where
 	T: Deserialize<'a>,
 {
-	let outer : OuterMessage<Option<T>> = serde_json::from_slice(data)?;
-	if let Some(error) = outer._embedded.status {
-		Ok(Err(error))
-	} else if let Some(inner) = outer._embedded._state {
-		Ok(Ok(inner))
-	} else {
-		Err(serde_json::Error::missing_field("_state"))
-	}
+	let outer : OuterMessage<InnerMessage<Vec<T>>> = serde_json::from_slice(data)?;
+	Ok(outer._embedded._state)
 }
 
-pub fn parse_one<'a, T>(data: &'a [u8]) -> Result<Result<T, ErrorStatus>, serde_json::Error>
+pub fn parse_one<'a, T>(data: &'a [u8]) -> Result<T, serde_json::Error>
 where
 	T: Deserialize<'a>,
 {
-	let outer : OuterMessage<OneOrNone<T>> = serde_json::from_slice(data)?;
-	if let Some(error) = outer._embedded.status {
-		Ok(Err(error))
-	} else if let Some(inner) = outer._embedded._state.into_option() {
-		Ok(Ok(inner))
-	} else {
-		Err(serde_json::Error::missing_field("_state"))
+	let outer : OuterMessage<InnerMessage<(T, )>> = serde_json::from_slice(data)?;
+	Ok(outer._embedded._state.0)
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use assert2::assert;
+
+	#[test]
+	fn test_parse_bad_signal() {
+		assert!(let Ok(ErrorStatus { code: 0xc0048409, .. }) = parse_error(include_bytes!("../../samples/bad_signal.json")));
 	}
 }

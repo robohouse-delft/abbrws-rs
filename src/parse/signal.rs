@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use super::ErrorStatus;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Deserialize)]
 pub enum SignalKind {
@@ -132,28 +131,16 @@ impl Signal {
 	}
 }
 
-pub fn parse_one(data: &[u8]) -> serde_json::Result<Result<Signal, ErrorStatus>> {
-	let raw : RawSingleSignal = match super::parse_one(data) {
-		Ok(Ok(x)) => x,
-		Err(e) => return Err(e),
-		Ok(Err(e)) => return Ok(Err(e)),
-	};
-
-	Ok(Ok(Signal::from_single_raw(raw)?))
+pub fn parse_one(data: &[u8]) -> serde_json::Result<Signal> {
+	super::parse_one::<RawSingleSignal>(data)
+		.and_then(Signal::from_single_raw)
 }
 
-pub fn parse_list(data: &[u8]) -> serde_json::Result<Result<Vec<Signal>, ErrorStatus>> {
-	let raw : Vec<RawListSignal> = match super::parse(data) {
-		Ok(Ok(x)) => x,
-		Err(e) => return Err(e),
-		Ok(Err(e)) => return Ok(Err(e)),
-	};
-
-	let mut out = Vec::with_capacity(raw.len());
-	for raw in raw {
-		out.push(Signal::from_list_raw(raw)?);
-	}
-	Ok(Ok(out))
+pub fn parse_list(data: &[u8]) -> serde_json::Result<Vec<Signal>> {
+	super::parse_vec::<RawListSignal>(data)?
+		.into_iter()
+		.map(Signal::from_list_raw)
+		.collect()
 }
 
 #[cfg(test)]
@@ -165,22 +152,19 @@ mod test {
 	#[test]
 	fn test_parse_signals() {
 		let parsed = parse_list(include_bytes!("../../samples/signals.json"));
-		assert!(let Ok(Ok(_)) = &parsed);
-		let parsed = parsed.unwrap().unwrap();
+		assert!(let Ok(_) = &parsed);
 	}
 
 	#[test]
 	fn test_parse_bad_signal() {
-		assert!(let Ok(Err(ErrorStatus { code: 0xc0048409, msg: _ })) = parse_one(include_bytes!("../../samples/bad_signal.json")));
-		assert!(let Ok(Err(ErrorStatus { code: 0xc0048409, msg: _ })) = parse_list(include_bytes!("../../samples/bad_signal.json")));
+		assert!(let Err(_) = parse_one(include_bytes!("../../samples/bad_signal.json")));
 	}
 
 	#[test]
 	fn test_parse_signal() {
-		let parsed = match parse_one(include_bytes!("../../samples/good_signal.json")) {
-			Ok(Ok(x)) => x,
-			err => { assert!(let Ok(Ok(_)) = err); panic!(); },
-		};
+		let parsed = parse_one(include_bytes!("../../samples/good_signal.json"));
+		assert!(let Ok(_) = &parsed);
+		let parsed = parsed.unwrap();
 
 		check!(parsed.title    == "Local/PANEL/SS2");
 		check!(parsed.category == "safety");
