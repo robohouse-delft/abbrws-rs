@@ -18,7 +18,7 @@ pub use parse::signal::Signal;
 pub use parse::signal::SignalKind;
 pub use parse::signal::SignalValue;
 
-pub struct Client<C> {
+pub struct Client<C = hyper::client::HttpConnector> {
 	root_url: http::Uri,
 	auth_cache: DigestAuthCache,
 	http_client: hyper::Client<C, hyper::Body>,
@@ -39,6 +39,13 @@ where
 			auth_cache: DigestAuthCache::new(user.into(), password.into()),
 			cookies: CookieJar::new(),
 		})
+	}
+
+	pub fn new_default(host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri>
+	where
+		hyper::Client<C>: Default,
+	{
+		Self::new(Default::default(), host, user, password)
 	}
 
 	pub async fn login(&mut self) -> Result<(), Error> {
