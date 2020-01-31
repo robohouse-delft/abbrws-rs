@@ -25,6 +25,8 @@ pub struct Client<C> {
 	cookies: CookieJar,
 }
 
+type Request = hyper::Request<hyper::Body>;
+
 impl<C> Client<C>
 where
 	C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -58,6 +60,10 @@ where
 	}
 
 	async fn get(&mut self, url: http::Uri) -> Result<Vec<u8>, Error> {
+		self.request(|| hyper::Request::get(url.clone()).body(hyper::Body::empty())).await
+	}
+
+	async fn request(&mut self, mut make_request: impl FnMut() -> http::Result<Request>) -> Result<Vec<u8>, Error> {
 		// Copy cookies into a list of HeaderValue objects.
 		let cookie_headers : Vec<_> = self.cookies.iter().map(|cookie| {
 			// Unwrap should be fine, we already parsed it from a HeaderValue earlier.
@@ -65,9 +71,8 @@ where
 			hyper::header::HeaderValue::from_str(&value).unwrap()
 		}).collect();
 
-		// Add cookies.
-		let request = move || {
-			let mut request = hyper::Request::get(url.clone()).body(hyper::Body::empty())?;
+		let make_request = move || {
+			let mut request = make_request()?;
 			for cookie in &cookie_headers {
 				request.headers_mut().append(hyper::header::COOKIE, cookie.clone());
 			}
@@ -75,7 +80,7 @@ where
 		};
 
 		// Perform request.
-		let response = self.auth_cache.request(&mut self.http_client, request).await?;
+		let response = self.auth_cache.request(&mut self.http_client, make_request).await?;
 
 		// Parse cookies.
 		let headers = response.headers();
