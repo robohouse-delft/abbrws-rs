@@ -1,6 +1,5 @@
 use structopt::StructOpt;
-
-type Client = abbrws::Client;
+use yansi::Paint;
 
 #[derive(StructOpt)]
 #[structopt(setting(structopt::clap::AppSettings::DeriveDisplayOrder))]
@@ -46,6 +45,10 @@ async fn main() {
 }
 
 async fn do_main(options: &Options) -> Result<(), String> {
+	if !should_color() {
+		Paint::disable();
+	}
+
 	let mut client = abbrws::Client::new_default(&options.host, &options.user, &options.password)
 		.map_err(|e| format!("Failed to connect to {:?}: {}", options.host, e))?;
 
@@ -62,37 +65,70 @@ async fn do_main(options: &Options) -> Result<(), String> {
 	}
 }
 
-async fn list_signals(client: &mut Client) -> Result<(), String> {
+async fn list_signals(client: &mut abbrws::Client) -> Result<(), String> {
 	let signals = client.get_signals().await
 		.map_err(|e| format!("Failed to retrieve signals: {}", e))?;
 
 	let title_width = signals.iter().map(|x| x.title.len()).max().unwrap_or(0);
 
 	for signal in signals {
-		println!("{title:<title_width$} : {kind:<14} = {value}",
-			title       = signal.title,
+		println!("{title:<title_width$} = {value:<10} ({kind})",
+			title       = Paint::blue(signal.title),
 			title_width = title_width,
-			kind        = signal.kind,
-			value       = signal.lvalue
+			kind        = Paint::magenta(signal.kind),
+			value       = Paint::yellow(format!("{}", signal.lvalue)),
 		);
 	}
 	Ok(())
 }
 
-async fn show_signal(client: &mut Client, signal: &str) -> Result<(),  String> {
+async fn show_signal(client: &mut abbrws::Client, signal: &str) -> Result<(),  String> {
 	let signal = client.get_signal(signal).await
 		.map_err(|e| format!("Failed to retrieve signal {:?}: {}", signal, e))?;
-		println!("{title} : {kind} = {value}",
-			title = signal.title,
-			kind  = signal.kind,
-			value = signal.lvalue
+		println!("{title} = {value} ({kind})",
+			title = Paint::blue(signal.title),
+			kind  = Paint::magenta(signal.kind),
+			value = Paint::yellow(signal.lvalue),
 		);
 	Ok(())
 
 }
 
-async fn set_signal(client: &mut Client, signal: &str, value: abbrws::SignalValue) -> Result<(), String> {
+async fn set_signal(client: &mut abbrws::Client, signal: &str, value: abbrws::SignalValue) -> Result<(), String> {
 	client.set_signal(signal, value).await
 		.map_err(|e| format!("Failed to set signal {:?} to {}: {}", signal, value, e))?;
 	Ok(())
+}
+
+extern "C" {
+	fn isatty(fd: std::os::raw::c_int) -> std::os::raw::c_int;
+}
+
+fn stdout_is_tty() -> bool {
+	unsafe { isatty(1) != 0 }
+}
+
+fn should_color() -> bool {
+	// CLICOLOR not set? Check if stdout is a TTY.
+	let clicolor = match std::env::var_os("CLICOLOR") {
+		Some(x) => x,
+		None => return stdout_is_tty(),
+	};
+
+	// CLICOLOR not ascii? Disable colors.
+	let clicolor = match clicolor.to_str() {
+		Some(x) => x,
+		None => return false,
+	};
+
+	if clicolor.eq_ignore_ascii_case("auto") {
+		stdout_is_tty()
+	} else {
+		let force = false;
+		let force = force || clicolor.eq_ignore_ascii_case("yes");
+		let force = force || clicolor.eq_ignore_ascii_case("true");
+		let force = force || clicolor.eq_ignore_ascii_case("always");
+		let force = force || clicolor.eq_ignore_ascii_case("1");
+		force
+	}
 }

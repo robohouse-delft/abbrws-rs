@@ -12,3 +12,4 @@ edition = "2018"
 abbrws = { version="0.1.0", path = ".." }
 tokio = { version="0.2.9", features=["rt-threaded", "macros"] }
 structopt = "0.3.8"
+yansi = "0.5.0"
