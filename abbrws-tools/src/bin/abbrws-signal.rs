@@ -5,6 +5,7 @@ use yansi::Paint;
 #[structopt(setting(structopt::clap::AppSettings::DeriveDisplayOrder))]
 #[structopt(setting(structopt::clap::AppSettings::ColoredHelp))]
 #[structopt(setting(structopt::clap::AppSettings::UnifiedHelpMessage))]
+#[structopt(group(structopt::clap::ArgGroup::with_name("selection").required(true)))]
 struct Options {
 	/// The host to connect to.
 	#[structopt(long, short)]
