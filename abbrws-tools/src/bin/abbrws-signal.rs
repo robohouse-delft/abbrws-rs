@@ -1,6 +1,6 @@
 use structopt::StructOpt;
 
-type Client = abbrws::Client<hyper::client::HttpConnector>;
+type Client = abbrws::Client;
 
 #[derive(StructOpt)]
 #[structopt(setting(structopt::clap::AppSettings::DeriveDisplayOrder))]
@@ -46,7 +46,7 @@ async fn main() {
 }
 
 async fn do_main(options: &Options) -> Result<(), String> {
-	let mut client = abbrws::Client::new(hyper::Client::new(), &options.host, &options.user, &options.password)
+	let mut client = abbrws::Client::new_default(&options.host, &options.user, &options.password)
 		.map_err(|e| format!("Failed to connect to {:?}: {}", options.host, e))?;
 
 	if options.list {
