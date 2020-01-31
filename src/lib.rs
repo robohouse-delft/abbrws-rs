@@ -59,6 +59,15 @@ where
 		Ok(parse::signal::parse_one(&body)?)
 	}
 
+	pub async fn set_signal(&mut self, signal: impl AsRef<str>, value: SignalValue) -> Result<(), Error> {
+		let url : http::Uri = format!("{}/rw/iosystem/signals/{}/?action=set&json=1", self.root_url, signal.as_ref()).parse().unwrap();
+		self.request(move || hyper::Request::post(url.clone())
+			.header(hyper::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+			.body(format!("lvalue={}", value).into())
+		).await?;
+		Ok(())
+	}
+
 	async fn get(&mut self, url: http::Uri) -> Result<Vec<u8>, Error> {
 		self.request(|| hyper::Request::get(url.clone()).body(hyper::Body::empty())).await
 	}

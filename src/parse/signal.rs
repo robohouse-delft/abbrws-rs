@@ -28,6 +28,29 @@ pub enum SignalValue {
 	Group(u64),
 }
 
+impl std::fmt::Display for SignalKind {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			SignalKind::DigitalInput  => f.pad("digital input"),
+			SignalKind::DigitalOutput => f.pad("digital output"),
+			SignalKind::AnalogInput   => f.pad("analog input"),
+			SignalKind::AnalogOutput  => f.pad("analog output"),
+			SignalKind::GroupInput    => f.pad("group input"),
+			SignalKind::GroupOutput   => f.pad("group output"),
+		}
+	}
+}
+
+impl std::fmt::Display for SignalValue {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			SignalValue::Binary(x) => write!(f, "{}", if *x { 1 } else { 0 }),
+			SignalValue::Analog(x) => write!(f, "{}", x),
+			SignalValue::Group(x) => write!(f, "0x{:08X}", x),
+		}
+	}
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize)]
 struct RawSingleSignal<'a> {
 	#[serde(rename = "_title")]
