@@ -54,7 +54,7 @@ where
 	}
 
 	pub async fn get_signal(&mut self, signal: impl AsRef<str>) -> Result<Signal, Error> {
-		let url = format!("{}/rw/iosystem/signal/{}/?json=1", self.root_url, signal.as_ref()).parse().unwrap();
+		let url = format!("{}/rw/iosystem/signals/{}/?json=1", self.root_url, signal.as_ref()).parse().unwrap();
 		let body = self.get(url).await?;
 		Ok(parse::signal::parse_one(&body)?)
 	}
