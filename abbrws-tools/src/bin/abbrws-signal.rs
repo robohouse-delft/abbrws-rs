@@ -34,7 +34,7 @@ struct Options {
 	/// Set the value of a signal.
 	#[structopt(long)]
 	#[structopt(requires = "signal")]
-	set: Option<bool>
+	set: Option<abbrws::SignalValue>
 }
 
 #[tokio::main]

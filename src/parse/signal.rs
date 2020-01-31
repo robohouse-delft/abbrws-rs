@@ -46,7 +46,37 @@ impl std::fmt::Display for SignalValue {
 		match self {
 			SignalValue::Binary(x) => write!(f, "{}", if *x { 1 } else { 0 }),
 			SignalValue::Analog(x) => write!(f, "{}", x),
-			SignalValue::Group(x) => write!(f, "0x{:08X}", x),
+			SignalValue::Group(x)  => write!(f, "{}", x),
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct SignalValueFromStrError;
+impl std::error::Error for SignalValueFromStrError {}
+
+impl std::fmt::Display for SignalValueFromStrError {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "invalid signal value")
+	}
+}
+
+impl std::str::FromStr for SignalValue {
+	type Err = SignalValueFromStrError;
+
+	fn from_str(input: &str) -> Result<Self, Self::Err> {
+		if input == "1" {
+			Ok(SignalValue::Binary(true))
+		} else if input == "0" {
+			Ok(SignalValue::Binary(false))
+		} else if let Ok(value) = input.parse::<bool>() {
+			Ok(SignalValue::Binary(value))
+		} else if let Ok(value) = input.parse::<u64>() {
+			Ok(SignalValue::Group(value))
+		} else if let Ok(value) = input.parse::<f64>() {
+			Ok(SignalValue::Analog(value))
+		} else {
+			Err(SignalValueFromStrError)
 		}
 	}
 }
