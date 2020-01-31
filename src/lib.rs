@@ -92,7 +92,7 @@ where
 		let http_status = response.status();
 		let content_type = get_content_type(&response)?;
 
-		if http_status == http::StatusCode::OK {
+		if http_status.is_success() {
 			if content_type.essence_str() == "application/json" {
 				Ok(collect_body(response).await?)
 			} else {
