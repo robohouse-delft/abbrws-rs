@@ -34,7 +34,7 @@ impl std::fmt::Display for RemoteFailureError {
 		write!(f, "remote call failed with HTTP status {}", self.http_status)?;
 
 		if let Some(code) = self.code {
-			write!(f, "and code 0x{:08X}", code)?;
+			write!(f, " and code 0x{:08X}", code)?;
 		}
 
 		if !self.message.is_empty() {
