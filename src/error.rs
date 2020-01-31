@@ -31,10 +31,10 @@ pub enum Error {
 
 impl std::fmt::Display for RemoteFailureError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "remote call failed with HTTP status {}", self.http_status)?;
+		write!(f, "remote call failed with HTTP status {}", self.http_status.as_u16())?;
 
 		if let Some(code) = self.code {
-			write!(f, " and code 0x{:08X}", code)?;
+			write!(f, " and error code {}", code as i32)?;
 		}
 
 		if !self.message.is_empty() {
