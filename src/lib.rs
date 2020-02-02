@@ -27,10 +27,14 @@ pub struct Client<C = hyper::client::HttpConnector> {
 
 type Request = hyper::Request<hyper::Body>;
 
+/// ABB RWS client
+///
+/// The client manages a session with an ABB RobotWare controller.
 impl<C> Client<C>
 where
 	C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
+	/// Create a new client.
 	pub fn new(host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri>
 	where
 		hyper::Client<C>: Default,
@@ -38,6 +42,7 @@ where
 		Self::new_with_http_client(Default::default(), host, user, password)
 	}
 
+	/// Create a new client using an existing [`hyper::Client`] for the HTTP requests.
 	pub fn new_with_http_client(http_client: hyper::Client<C, hyper::Body>, host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri> {
 		let root_url = hyper::Uri::try_from(format!("http://{}", host.as_ref()))?;
 		Ok(Self {
@@ -48,24 +53,41 @@ where
 		})
 	}
 
+	/// Establish a session with the server.
+	///
+	/// It is not required to call this function,
+	/// since a session will be established automatically when needed,
+	/// However, this allows you to avoids the overhead of digest authentication later on.
+	///
+	/// It can also be used to test the communication with the server.
+	///
+	/// Note that the session may still expire if the server decides so,
+	/// in which case a new session will be established automatically.
 	pub async fn login(&mut self) -> Result<(), Error> {
 		let url = format!("{}/?json=1", self.root_url).parse().unwrap();
 		self.get(url).await?;
 		Ok(())
 	}
 
+	/// Get a list of all signals on the robot, inclusing their current status.
 	pub async fn get_signals(&mut self) -> Result<Vec<Signal>, Error> {
 		let url = format!("{}/rw/iosystem/signals?json=1", self.root_url).parse().unwrap();
 		let body = self.get(url).await?;
 		Ok(parse::signal::parse_list(&body)?)
 	}
 
+	/// Get the details for a single signal.
+	///
+	/// You can use [`get_signals`] to get a list of all available signals.
 	pub async fn get_signal(&mut self, signal: impl AsRef<str>) -> Result<Signal, Error> {
 		let url = format!("{}/rw/iosystem/signals/{}/?json=1", self.root_url, signal.as_ref()).parse().unwrap();
 		let body = self.get(url).await?;
 		Ok(parse::signal::parse_one(&body)?)
 	}
 
+	/// Set the value of a signal.
+	///
+	/// You can use [`get_signals`] to get a list of all available signals.
 	pub async fn set_signal(&mut self, signal: impl AsRef<str>, value: SignalValue) -> Result<(), Error> {
 		let url : http::Uri = format!("{}/rw/iosystem/signals/{}/?action=set&json=1", self.root_url, signal.as_ref()).parse().unwrap();
 		self.request(move || hyper::Request::post(url.clone())
@@ -75,10 +97,14 @@ where
 		Ok(())
 	}
 
+	/// Perform a GET request.
 	async fn get(&mut self, url: http::Uri) -> Result<Vec<u8>, Error> {
 		self.request(|| hyper::Request::get(url.clone()).body(hyper::Body::empty())).await
 	}
 
+	/// Perform a HTTP request.
+	///
+	/// This function takes care of HTTP digest authentication and cookies.
 	async fn request(&mut self, mut make_request: impl FnMut() -> http::Result<Request>) -> Result<Vec<u8>, Error> {
 		// Copy cookies into a list of HeaderValue objects.
 		let cookie_headers : Vec<_> = self.cookies.iter().map(|cookie| {
@@ -129,6 +155,7 @@ where
 	}
 }
 
+/// Get a mime type from the ContentType header of an HTTP Response.
 fn get_content_type<B>(response: &hyper::Response<B>) -> Result<Mime, MalformedContentTypeError> {
 	let content_type = response.headers().get(hyper::header::CONTENT_TYPE)
 		.ok_or(MalformedContentTypeError { content_type: Vec::new() })?;
@@ -141,6 +168,7 @@ fn get_content_type<B>(response: &hyper::Response<B>) -> Result<Mime, MalformedC
 	content_type.parse().map_err(|_| make_error())
 }
 
+/// Convert a plain text HTTP response to a RemoteFailureError.
 fn plain_text_to_error(http_status: hyper::StatusCode, body: Vec<u8>) -> RemoteFailureError {
 	let message = String::from_utf8(body).ok()
 		.filter(|x| x.len() <= 150)
@@ -153,6 +181,7 @@ fn plain_text_to_error(http_status: hyper::StatusCode, body: Vec<u8>) -> RemoteF
 	}
 }
 
+/// Collect the body of an HTTP response into a vector.
 async fn collect_body(response: hyper::Response<hyper::Body>) -> Result<Vec<u8>, hyper::Error> {
 	let mut body = response.into_body();
 	let mut data = Vec::with_capacity(512);
