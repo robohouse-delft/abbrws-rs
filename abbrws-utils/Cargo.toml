@@ -9,7 +9,7 @@ authors = [
 edition = "2018"
 
 [dependencies]
-abbrws = { version="0.1.0", path = ".." }
+abbrws = { version="0.1.0", path = "../abbrws" }
 tokio = { version="0.2.9", features=["rt-threaded", "macros"] }
 structopt = "0.3.8"
 yansi = "0.5.0"

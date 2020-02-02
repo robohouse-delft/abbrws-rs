@@ -204,18 +204,18 @@ mod test {
 
 	#[test]
 	fn test_parse_signals() {
-		let parsed = parse_list(include_bytes!("../../samples/signals.json"));
+		let parsed = parse_list(include_bytes!("../../../samples/signals.json"));
 		assert!(let Ok(_) = &parsed);
 	}
 
 	#[test]
 	fn test_parse_bad_signal() {
-		assert!(let Err(_) = parse_one(include_bytes!("../../samples/bad_signal.json")));
+		assert!(let Err(_) = parse_one(include_bytes!("../../../samples/bad_signal.json")));
 	}
 
 	#[test]
 	fn test_parse_signal() {
-		let parsed = parse_one(include_bytes!("../../samples/good_signal.json"));
+		let parsed = parse_one(include_bytes!("../../../samples/good_signal.json"));
 		assert!(let Ok(_) = &parsed);
 		let parsed = parsed.unwrap();
 

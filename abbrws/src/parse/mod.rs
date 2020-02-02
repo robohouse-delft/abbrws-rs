@@ -63,6 +63,6 @@ mod test {
 
 	#[test]
 	fn test_parse_bad_signal() {
-		assert!(let Ok(ErrorStatus { code: 0xc0048409, .. }) = parse_error(include_bytes!("../../samples/bad_signal.json")));
+		assert!(let Ok(ErrorStatus { code: 0xc0048409, .. }) = parse_error(include_bytes!("../../../samples/bad_signal.json")));
 	}
 }

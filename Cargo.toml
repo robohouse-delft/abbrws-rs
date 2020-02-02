@@ -1,24 +1,2 @@
-[package]
-name = "abbrws"
-version = "0.1.0"
-repository = "https://github.com/robohouse-delft/abbrws-rs"
-authors = [
-	"Maarten de Vries <maarten@de-vri.es>",
-	"RoboHouse <robohouse@robovalley.com>",
-]
-edition = "2018"
-
-[dependencies]
-cookie = "0.12.0"
-digest_auth = "0.2.1"
-http = "0.2.0"
-hyper = "0.13.1"
-mime = "0.3.16"
-serde = { version = "1.0.104", features = ["derive"] }
-serde_json = "1.0.44"
-
-[dev-dependencies]
-assert2 = "0.1.1"
-
 [workspace]
-members = ["abbrws-utils"]
+members = ["abbrws", "abbrws-utils"]
