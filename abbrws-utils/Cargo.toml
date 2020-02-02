@@ -1,5 +1,5 @@
 [package]
-name = "abbrws-tools"
+name = "abbrws-utils"
 version = "0.1.0"
 repository = "https://github.com/robohouse-delft/abbrws-rs"
 authors = [

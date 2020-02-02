@@ -21,4 +21,4 @@ serde_json = "1.0.44"
 assert2 = "0.1.1"
 
 [workspace]
-members = ["abbrws-tools"]
+members = ["abbrws-utils"]
