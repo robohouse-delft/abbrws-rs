@@ -50,7 +50,7 @@ async fn do_main(options: &Options) -> Result<(), String> {
 		Paint::disable();
 	}
 
-	let mut client = abbrws::Client::new_default(&options.host, &options.user, &options.password)
+	let mut client = abbrws::Client::new(&options.host, &options.user, &options.password)
 		.map_err(|e| format!("failed to connect to {:?}: {}", options.host, e))?;
 
 	if options.list {

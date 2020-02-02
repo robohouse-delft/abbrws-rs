@@ -31,7 +31,14 @@ impl<C> Client<C>
 where
 	C: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
-	pub fn new(http_client: hyper::Client<C, hyper::Body>, host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri> {
+	pub fn new(host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri>
+	where
+		hyper::Client<C>: Default,
+	{
+		Self::new_with_http_client(Default::default(), host, user, password)
+	}
+
+	pub fn new_with_http_client(http_client: hyper::Client<C, hyper::Body>, host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri> {
 		let root_url = hyper::Uri::try_from(format!("http://{}", host.as_ref()))?;
 		Ok(Self {
 			root_url,
@@ -39,13 +46,6 @@ where
 			auth_cache: DigestAuthCache::new(user.into(), password.into()),
 			cookies: CookieJar::new(),
 		})
-	}
-
-	pub fn new_default(host: impl AsRef<str>, user: impl Into<String>, password: impl Into<String>) -> Result<Self, http::uri::InvalidUri>
-	where
-		hyper::Client<C>: Default,
-	{
-		Self::new(Default::default(), host, user, password)
 	}
 
 	pub async fn login(&mut self) -> Result<(), Error> {
