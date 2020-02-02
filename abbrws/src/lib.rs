@@ -14,11 +14,15 @@ pub use error::MalformedContentTypeError;
 pub use error::UnexpectedContentTypeError;
 
 mod parse;
+pub use parse::file_service::DirEntry;
+pub use parse::file_service::Directory;
+pub use parse::file_service::File;
 pub use parse::signal::Signal;
 pub use parse::signal::SignalKind;
 pub use parse::signal::SignalValue;
 
 mod url_encode;
+use url_encode::url_encode_query_value;
 
 pub struct Client<C = hyper::client::HttpConnector> {
 	root_url: http::Uri,
@@ -97,6 +101,38 @@ where
 		Ok(())
 	}
 
+	/// List the files in a directory.
+	pub async fn list_files(&mut self, directory: &str) -> Result<Vec<DirEntry>, Error> {
+		let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, directory).parse().unwrap();
+		let body = self.get(url).await?;
+		Ok(parse::file_service::parse_directory_listing(&body)?)
+	}
+
+	/// Create a directory.
+	pub async fn create_directory(&mut self, directory: &str) -> Result<(), Error> {
+		let (parent, child) = rpartition(directory, '/');
+		let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, parent).parse().unwrap();
+		let data = format!("fs-newname={}&fs-action=create", url_encode_query_value(child));
+		self.post_form(url, data).await?;
+		Ok(())
+	}
+
+	/// Download a file from the controller.
+	pub async fn download_file(&mut self, path: &str) -> Result<Vec<u8>, Error> {
+		let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, path).parse().unwrap();
+		let body = self.get(url).await?;
+		// TODO: Check that it wasn't a directory somehow.
+		// Hopefully we can use the content type. Needs experimenting.
+		Ok(body)
+	}
+
+	/// Upload a file to the controller.
+	pub async fn upload_file(&mut self, path: &str, data: impl Into<Vec<u8>>) -> Result<(), Error> {
+		let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, path).parse().unwrap();
+		self.put(url, mime::APPLICATION_OCTET_STREAM, data).await?;
+		Ok(())
+	}
+
 	/// Perform a GET request.
 	async fn get(&mut self, url: http::Uri) -> Result<Vec<u8>, Error> {
 		self.request(|| hyper::Request::get(url.clone()).body(hyper::Body::empty())).await
@@ -107,6 +143,15 @@ where
 		let data = data.into();
 		self.request(move || hyper::Request::post(url.clone())
 			.header(hyper::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+			.body(data.clone().into())
+		).await
+	}
+
+	/// Perform a POST request with form data.
+	async fn put(&mut self, url: http::Uri, content_type: Mime, data: impl Into<Vec<u8>>) -> Result<Vec<u8>, Error> {
+		let data = data.into();
+		self.request(move || hyper::Request::post(url.clone())
+			.header(hyper::header::CONTENT_TYPE, content_type.as_ref())
 			.body(data.clone().into())
 		).await
 	}
@@ -199,4 +244,11 @@ async fn collect_body(response: hyper::Response<hyper::Body>) -> Result<Vec<u8>,
 	}
 
 	Ok(data)
+}
+
+fn rpartition(input: &str, pat: char) -> (&str, &str) {
+	match input.rfind(pat) {
+		Some(n) => (&input[..n], &input[n + 1..]),
+		None => (&input, &input[input.len()..]),
+	}
 }

@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use serde::Deserializer;
 
+pub mod file_service;
 pub mod signal;
 
 #[derive(Clone, Debug, Deserialize)]
