@@ -18,6 +18,8 @@ pub use parse::signal::Signal;
 pub use parse::signal::SignalKind;
 pub use parse::signal::SignalValue;
 
+mod url_encode;
+
 pub struct Client<C = hyper::client::HttpConnector> {
 	root_url: http::Uri,
 	auth_cache: DigestAuthCache,
