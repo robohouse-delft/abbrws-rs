@@ -90,16 +90,23 @@ where
 	/// You can use [`get_signals`] to get a list of all available signals.
 	pub async fn set_signal(&mut self, signal: impl AsRef<str>, value: SignalValue) -> Result<(), Error> {
 		let url : http::Uri = format!("{}/rw/iosystem/signals/{}/?action=set&json=1", self.root_url, signal.as_ref()).parse().unwrap();
-		self.request(move || hyper::Request::post(url.clone())
-			.header(hyper::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-			.body(format!("lvalue={}", value).into())
-		).await?;
+		let data = format!("lvalue={}", value);
+		self.post_form(url, data).await?;
 		Ok(())
 	}
 
 	/// Perform a GET request.
 	async fn get(&mut self, url: http::Uri) -> Result<Vec<u8>, Error> {
 		self.request(|| hyper::Request::get(url.clone()).body(hyper::Body::empty())).await
+	}
+
+	/// Perform a POST request with form data.
+	async fn post_form(&mut self, url: http::Uri, data: impl Into<Vec<u8>>) -> Result<Vec<u8>, Error> {
+		let data = data.into();
+		self.request(move || hyper::Request::post(url.clone())
+			.header(hyper::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+			.body(data.clone().into())
+		).await
 	}
 
 	/// Perform a HTTP request.
