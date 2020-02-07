@@ -3,6 +3,7 @@ use serde::Deserializer;
 
 pub mod file_service;
 pub mod signal;
+pub mod hacks;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ErrorStatus {
