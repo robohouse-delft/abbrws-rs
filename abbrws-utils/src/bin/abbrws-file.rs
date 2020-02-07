@@ -45,7 +45,14 @@ struct Options {
 	#[structopt(long)]
 	#[structopt(value_names = &["SOURCE", "DEST"])]
 	#[structopt(group = "command")]
+	#[structopt(requires = "content-type")]
 	upload: Option<Vec<String>>,
+
+	/// The content-type of the uploaded file.
+	#[structopt(long)]
+	#[structopt(value_name = "MIME")]
+	#[structopt(requires = "upload")]
+	content_type: Option<abbrws::Mime>,
 }
 
 #[tokio::main]
@@ -77,14 +84,15 @@ async fn do_main(options: &Options) -> Result<(), String> {
 		let source = &paths[0];
 		let destination = &paths[1];
 		let mut client = connect()?;
-		let data = client.download_file(source).await.map_err(|e| format!("failed to download file: {}", e))?;
+		let (content_type, data) = client.download_file(source).await.map_err(|e| format!("failed to download file: {}", e))?;
+		eprintln!("Content-Type: {}", content_type);
 		write_file(destination, data)?;
 	} else if let Some(paths) = &options.upload {
 		let source = &paths[0];
 		let destination = &paths[1];
 		let data = read_file(source)?;
 		let mut client = connect()?;
-		client.upload_file(destination, data).await.map_err(|e| format!("failed to upload file: {}", e))?;
+		client.upload_file(destination, options.content_type.clone().unwrap(), data).await.map_err(|e| format!("failed to upload file: {}", e))?;
 	}
 
 	Ok(())

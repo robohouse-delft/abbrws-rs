@@ -3,9 +3,9 @@ use cookie::Cookie;
 use cookie::CookieJar;
 use digest_auth_cache::DigestAuthCache;
 use hyper::body::HttpBody;
-use mime::Mime;
-
 use std::convert::TryFrom;
+
+pub use mime::Mime;
 
 mod error;
 pub use error::Error;
@@ -78,7 +78,8 @@ where
 	/// Get a list of all signals on the robot, inclusing their current status.
 	pub async fn get_signals(&mut self) -> Result<Vec<Signal>, Error> {
 		let url = format!("{}/rw/iosystem/signals?json=1", self.root_url).parse().unwrap();
-		let body = self.get(url).await?;
+		let (content_type, body) = self.get(url).await?;
+		check_content_type(content_type, mime::APPLICATION_JSON)?;
 		Ok(parse::signal::parse_list(&body)?)
 	}
 
@@ -87,7 +88,8 @@ where
 	/// You can use [`get_signals`] to get a list of all available signals.
 	pub async fn get_signal(&mut self, signal: impl AsRef<str>) -> Result<Signal, Error> {
 		let url = format!("{}/rw/iosystem/signals/{}/?json=1", self.root_url, signal.as_ref()).parse().unwrap();
-		let body = self.get(url).await?;
+		let (content_type, body) = self.get(url).await?;
+		check_content_type(content_type, mime::APPLICATION_JSON)?;
 		Ok(parse::signal::parse_one(&body)?)
 	}
 
@@ -104,7 +106,8 @@ where
 	/// List the files in a directory.
 	pub async fn list_files(&mut self, directory: &str) -> Result<Vec<DirEntry>, Error> {
 		let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, directory).parse().unwrap();
-		let body = self.get(url).await?;
+		let (content_type, body) = self.get(url).await?;
+		check_content_type(content_type, mime::APPLICATION_JSON)?;
 		Ok(parse::file_service::parse_directory_listing(&body)?)
 	}
 
@@ -118,7 +121,7 @@ where
 	}
 
 	/// Download a file from the controller.
-	pub async fn download_file(&mut self, path: &str) -> Result<Vec<u8>, Error> {
+	pub async fn download_file(&mut self, path: &str) -> Result<(Mime, Vec<u8>), Error> {
 		let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, path).parse().unwrap();
 		let body = self.get(url).await?;
 		// TODO: Check that it wasn't a directory somehow.
@@ -127,19 +130,19 @@ where
 	}
 
 	/// Upload a file to the controller.
-	pub async fn upload_file(&mut self, path: &str, data: impl Into<Vec<u8>>) -> Result<(), Error> {
+	pub async fn upload_file(&mut self, path: &str, content_type: Mime, data: impl Into<Vec<u8>>) -> Result<(), Error> {
 		let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, path).parse().unwrap();
-		self.put(url, mime::APPLICATION_OCTET_STREAM, data).await?;
+		self.put(url, content_type, data).await?;
 		Ok(())
 	}
 
 	/// Perform a GET request.
-	async fn get(&mut self, url: http::Uri) -> Result<Vec<u8>, Error> {
+	async fn get(&mut self, url: http::Uri) -> Result<(Mime, Vec<u8>), Error> {
 		self.request(|| hyper::Request::get(url.clone()).body(hyper::Body::empty())).await
 	}
 
 	/// Perform a POST request with form data.
-	async fn post_form(&mut self, url: http::Uri, data: impl Into<Vec<u8>>) -> Result<Vec<u8>, Error> {
+	async fn post_form(&mut self, url: http::Uri, data: impl Into<Vec<u8>>) -> Result<(Mime, Vec<u8>), Error> {
 		let data = data.into();
 		self.request(move || hyper::Request::post(url.clone())
 			.header(hyper::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
@@ -148,7 +151,7 @@ where
 	}
 
 	/// Perform a POST request with form data.
-	async fn put(&mut self, url: http::Uri, content_type: Mime, data: impl Into<Vec<u8>>) -> Result<Vec<u8>, Error> {
+	async fn put(&mut self, url: http::Uri, content_type: Mime, data: impl Into<Vec<u8>>) -> Result<(Mime, Vec<u8>), Error> {
 		let data = data.into();
 		self.request(move || hyper::Request::post(url.clone())
 			.header(hyper::header::CONTENT_TYPE, content_type.as_ref())
@@ -159,7 +162,7 @@ where
 	/// Perform a HTTP request.
 	///
 	/// This function takes care of HTTP digest authentication and cookies.
-	async fn request(&mut self, mut make_request: impl FnMut() -> http::Result<Request>) -> Result<Vec<u8>, Error> {
+	async fn request(&mut self, mut make_request: impl FnMut() -> http::Result<Request>) -> Result<(Mime, Vec<u8>), Error> {
 		// Copy cookies into a list of HeaderValue objects.
 		let cookie_headers : Vec<_> = self.cookies.iter().map(|cookie| {
 			// Unwrap should be fine, we already parsed it from a HeaderValue earlier.
@@ -189,11 +192,7 @@ where
 		let content_type = get_content_type(&response)?;
 
 		if http_status.is_success() {
-			if content_type.essence_str() == "application/json" {
-				Ok(collect_body(response).await?)
-			} else {
-				Err(UnexpectedContentTypeError { actual: content_type, expected: "application/json".into() }.into())
-			}
+			Ok((content_type, collect_body(response).await?))
 		} else {
 			match content_type.essence_str() {
 				"text/plain" => {
@@ -206,6 +205,14 @@ where
 				_ => Err(UnexpectedContentTypeError { actual: content_type, expected: "application/json or text/plain".into() }.into()),
 			}
 		}
+	}
+}
+
+fn check_content_type(actual: Mime, expected: Mime) -> Result<(), UnexpectedContentTypeError> {
+	if actual.essence_str() == expected.essence_str() {
+		Ok(())
+	} else {
+		Err(UnexpectedContentTypeError { actual: actual, expected: String::from(expected.essence_str()) }.into())
 	}
 }
 
