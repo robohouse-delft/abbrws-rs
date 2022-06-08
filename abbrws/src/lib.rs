@@ -24,7 +24,7 @@ pub use parse::signal::SignalValue;
 mod url_encode;
 use url_encode::url_encode_query_value;
 
-pub struct Client<C = hyper::client::HttpConnector> {
+pub struct Client<C = hyper::client::connect::HttpConnector> {
 	root_url: http::Uri,
 	auth_cache: DigestAuthCache,
 	http_client: hyper::Client<C, hyper::Body>,

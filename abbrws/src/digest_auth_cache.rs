@@ -110,11 +110,11 @@ fn convert_method(method: &hyper::Method) -> digest_auth::HttpMethod {
 		&hyper::Method::GET => digest_auth::HttpMethod::GET,
 		&hyper::Method::POST => digest_auth::HttpMethod::POST,
 		&hyper::Method::HEAD => digest_auth::HttpMethod::HEAD,
-		&hyper::Method::PUT => digest_auth::HttpMethod::OTHER("PUT"),
-		&hyper::Method::DELETE => digest_auth::HttpMethod::OTHER("DELETE"),
-		&hyper::Method::PATCH => digest_auth::HttpMethod::OTHER("PATCH"),
-		&hyper::Method::CONNECT => digest_auth::HttpMethod::OTHER("CONNECT"),
-		&hyper::Method::TRACE => digest_auth::HttpMethod::OTHER("TRACE"),
+		&hyper::Method::PUT => digest_auth::HttpMethod::PUT,
+		&hyper::Method::DELETE => digest_auth::HttpMethod::DELETE,
+		&hyper::Method::PATCH => digest_auth::HttpMethod::PATCH,
+		&hyper::Method::CONNECT => digest_auth::HttpMethod::CONNECT,
+		&hyper::Method::TRACE => digest_auth::HttpMethod::TRACE,
 		x => panic!("unsupported HTTP method: {}", x.as_ref()),
 	}
 }
