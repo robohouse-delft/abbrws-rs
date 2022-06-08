@@ -127,7 +127,7 @@ impl Signal {
 		let value = match raw.kind {
 			SignalKind::AnalogInput | SignalKind::AnalogOutput => {
 				raw.lvalue.parse::<f64>()
-					.map(|x| SignalValue::Analog(x))
+					.map(SignalValue::Analog)
 					.map_err(|_| Error::invalid_type(Unexpected::Str(raw.lvalue), &"floating-point value"))
 			},
 			SignalKind::DigitalInput | SignalKind::DigitalOutput => {
@@ -139,7 +139,7 @@ impl Signal {
 			},
 			SignalKind::GroupInput | SignalKind::GroupOutput => {
 				raw.lvalue.parse::<u64>()
-					.map(|x| SignalValue::Group(x))
+					.map(SignalValue::Group)
 					.map_err(|_| Error::invalid_type(Unexpected::Str(raw.lvalue), &"integer"))
 			},
 		}?;

@@ -24,7 +24,7 @@ impl std::fmt::Display for UrlEncodeQueryValue<'_> {
 				remaining = &remaining[safe_till + 1..];
 			// Nothing to escape, just write it all at once.
 			} else {
-				write!(f, "{}", unsafe { std::str::from_utf8_unchecked(&remaining) })?;
+				write!(f, "{}", unsafe { std::str::from_utf8_unchecked(remaining) })?;
 				break;
 			}
 		}

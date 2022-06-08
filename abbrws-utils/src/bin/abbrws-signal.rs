@@ -110,6 +110,7 @@ fn stdout_is_tty() -> bool {
 	unsafe { isatty(1) != 0 }
 }
 
+#[allow(clippy::let_and_return)]
 fn should_color() -> bool {
 	// CLICOLOR not set? Check if stdout is a TTY.
 	let clicolor = match std::env::var_os("CLICOLOR") {

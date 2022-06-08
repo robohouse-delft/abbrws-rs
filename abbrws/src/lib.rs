@@ -179,7 +179,7 @@ where
 		};
 
 		// Perform request.
-		let response = self.auth_cache.request(&mut self.http_client, make_request).await?;
+		let response = self.auth_cache.request(&self.http_client, make_request).await?;
 
 		// Parse cookies.
 		let headers = response.headers();
@@ -212,7 +212,10 @@ fn check_content_type(actual: Mime, expected: Mime) -> Result<(), UnexpectedCont
 	if actual.essence_str() == expected.essence_str() {
 		Ok(())
 	} else {
-		Err(UnexpectedContentTypeError { actual: actual, expected: String::from(expected.essence_str()) }.into())
+		Err(UnexpectedContentTypeError {
+			actual,
+			expected: String::from(expected.essence_str()),
+		})
 	}
 }
 

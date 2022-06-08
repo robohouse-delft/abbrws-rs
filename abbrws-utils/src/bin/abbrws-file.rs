@@ -75,7 +75,7 @@ async fn do_main(options: &Options) -> Result<(), String> {
 
 	if let Some(directory) = &options.list {
 		let mut client = connect()?;
-		let entries = client.list_files(&directory).await.map_err(|e| format!("failed to retrieve directory contents: {}", e))?;
+		let entries = client.list_files(directory).await.map_err(|e| format!("failed to retrieve directory contents: {}", e))?;
 		println!("{:#?}", entries);
 	} else if let Some(directory) = &options.create_dir {
 		let mut client = connect()?;
@@ -116,6 +116,7 @@ fn stdout_is_tty() -> bool {
 	unsafe { isatty(1) != 0 }
 }
 
+#[allow(clippy::let_and_return)]
 fn should_color() -> bool {
 	// CLICOLOR not set? Check if stdout is a TTY.
 	let clicolor = match std::env::var_os("CLICOLOR") {
