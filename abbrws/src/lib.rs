@@ -113,10 +113,15 @@ where
 
 	/// Create a directory.
 	pub async fn create_directory(&mut self, directory: &str) -> Result<(), Error> {
-		let (parent, child) = rpartition(directory, '/');
-		let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, parent).parse().unwrap();
-		let data = format!("fs-newname={}&fs-action=create", url_encode_query_value(child));
-		self.post_form(url, data).await?;
+		if let Some((parent, child)) = directory.rsplit_once('/') {
+			let url : http::Uri = format!("{}/fileservice/{}/?json=1", self.root_url, parent).parse().unwrap();
+			let data = format!("fs-newname={}&fs-action=create", url_encode_query_value(child));
+			self.post_form(url, data).await?;
+		} else {
+			let url : http::Uri = format!("{}/fileservice/?json=1", self.root_url).parse().unwrap();
+			let data = format!("fs-newname={}&fs-action=create", url_encode_query_value(directory));
+			self.post_form(url, data).await?;
+		}
 		Ok(())
 	}
 
@@ -254,11 +259,4 @@ async fn collect_body(response: hyper::Response<hyper::Body>) -> Result<Vec<u8>,
 	}
 
 	Ok(data)
-}
-
-fn rpartition(input: &str, pat: char) -> (&str, &str) {
-	match input.rfind(pat) {
-		Some(n) => (&input[..n], &input[n + 1..]),
-		None => (&input, &input[input.len()..]),
-	}
 }
